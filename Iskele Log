@@ -1,0 +1,219 @@
+ISKELE LOG 
+
+Arch Linux installation with archinstall I choose xfce btrfs and timeshift it perfect so far
+
+- ssh enabled
+sudo systemctl enable sshd --now
+
+- timeshift is already installed 
+sudo pacman -Syu
+sudo pacman -S timeshift
+manually started and first snapshot taken
+
+- yay installation
+sudo pacman -S --needed base-devel git --noconfirm
+git clone https://aur.archlinux.org/yay.git
+cd yay
+makepkg -si --noconfirm
+
+
+
+- connect to cloudflare 
+
+
+- google chrome
+yay -S google-chrome --noconfirm
+
+- install kasmvnc
+sudo pacman -S inetutils
+sudo pacman -S --needed base-devel git --noconfirm
+sudo sh -c 'echo "192.168.1.103 iskele" >> /etc/hosts'
+cd ~/
+git clone https://github.com/vidalinux/AUR.git
+cd ~/AUR/perl-hash-merge-simple/
+makepkg -si
+cd ~/AUR/kasmvncserver-bin
+makepkg -si
+vncserver
+[1] Create a new user with write access 
+tm%passwd%passwd 
+[2] Manually edit xstartup
+
+
+
+
+
+
+
+cat << EOF > ~/.vnc/kasmvnc.yaml
+desktop:
+  resolution:
+    width: 1024
+    height: 768
+  allow_resize: true
+  pixel_depth: 24
+  gpu:
+    hw3d: false
+    drinode: /dev/dri/renderD128
+
+logging:
+  log_writer_name: all
+  log_dest: logfile
+  level: 100
+
+network:
+  protocol: http
+  interface: 0.0.0.0
+  websocket_port: auto
+  use_ipv4: true
+  use_ipv6: true
+  udp:
+    public_ip: auto
+    port: auto
+    stun_server: auto
+  ssl:
+    pem_certificate: /opt/ssl/certs/server.crt
+    pem_key: /opt/ssl/certs/server.key
+    require_ssl: true
+EOF
+
+sudo mkdir /opt/ssl/certs/ -p
+sudo chmod -R 777 /opt/ssl
+cd /opt/ssl/certs
+openssl genrsa -out server.key 3072
+
+openssl req -new -key server.key -out server.csr
+
+openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+
+openssl req -x509 -new -nodes -key server.key -sha256 -out ca.pem
+
+cat << EOF > ~/.vnc/xstartup
+#!/bin/sh
+
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+if [ -d /etc/X11/xinit/xinitrc.d ] ; then
+  for f in /etc/X11/xinit/xinitrc.d/?*.sh ; do
+    [ -x "\$f" ] && . "\$f"
+  done
+  unset f
+fi
+
+dbus-launch startxfce4 &
+EOF
+
+
+
+chmod +x ~/.vnc/xstartup
+mkdir -p ~/.config/systemd/user
+
+cat > ~/.config/systemd/user/vncserver\@\:2.service << EOF
+[Unit]
+Description=Remote desktop service (VNC)
+After=syslog.target network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/vncserver %i
+ExecStop=/usr/bin/vncserver -kill %i
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user enable vncserver@:2.service
+systemctl --user start vncserver@:2.service
+
+
+- docklike plugin
+
+- docker installation
+sudo pacman -S --needed docker docker-compose docker-buildx
+sudo systemctl enable --now docker
+sudo usermod -aG docker tm
+newgrp docker
+docker run --rm hello-world
+
+- cloudflare installation
+docker run -d \
+  --name cloudflared \
+  --restart unless-stopped \
+  cloudflare/cloudflared:latest \
+  tunnel --no-autoupdate run --token eyJhIjoiYTY2YzViNDZhZmI4ZTlmZjc5NDU5YTM0MGMyMmE4NDMiLCJ0IjoiNTU0YmE0OWQtZjY0NC00Y2E1LTlkOGMtZmIwOWM2NDllMTUxIiwicyI6Ik5tVTFaV0U1Wm1VdE5qWTFNaTAwTXpoaUxXSmhabUl0WTJJelpUZzNaRGRqTURneCJ9
+
+- ssh-local-keepalive.service
+sudo pacman -S --needed autossh openssh
+sudo systemctl enable --now sshd
+ssh-keygen -t iskele -a 64
+ssh-copy-id tm@localhost
+ssh -o BatchMode=yes tm@localhost 'echo OK'
+
+sudo tee /etc/systemd/system/ssh-local-keepalive.service > /dev/null <<'EOF'
+[Unit]
+Description=Keep a local SSH login session for tm (workaround)
+After=sshd.service network-online.target
+Wants=sshd.service network-online.target
+
+[Service]
+User=tm
+Environment=HOME=/home/tm
+WorkingDirectory=/home/tm
+Environment=AUTOSSH_GATETIME=0
+ExecStart=/usr/bin/autossh -M 0 -N \
+  -o BatchMode=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=/home/tm/.ssh/known_hosts \
+  tm@localhost
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now ssh-local-keepalive.service
+systemctl status ssh-local-keepalive.service --no-pager -n 20
+
+loginctl
+ps -ef | grep autossh | grep -v grep
+
+---gui settings---
+yay -S kali-themes kali-icons kali-wallpapers
+sudo pacman -Syu
+sudo pacman -S gnome-tweaks
+sudo pacman -S xfce4-whiskermenu-plugin
+sudo pacman -S ttf-fira-code
+pacman -S plank
+# make one workspaces
+sudo pacman -S mugshot
+sudo pacman -S konsole
+yay -S xfce4-docklike-plugin-git
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+- nomachine installed 
+yay -S nomachine
+sudo sed -i 's/^StartNXDaemon.*/StartNXDaemon Automatic/' /usr/NX/etc/server.cfg
+systemctl restart nxserver
+
