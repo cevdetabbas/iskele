@@ -1,14 +1,10 @@
 ISKELE LOG 
 
-Arch Linux installation with archinstall I choose xfce btrfs and timeshift it perfect so far
+Arch Linux installation with archinstall I choose xfce btrfs and timeshift it perfect so far galiba kernel icin lts gibi bisey kullandim 
 
 - ssh enabled
 sudo systemctl enable sshd --now
-
-- timeshift is already installed 
-sudo pacman -Syu
-sudo pacman -S timeshift
-manually started and first snapshot taken
+# manually start timeshift and take first snapshot
 
 - yay installation
 sudo pacman -S --needed base-devel git --noconfirm
